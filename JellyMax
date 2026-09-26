@@ -1,0 +1,215 @@
+-- Carregamento da Rayfield Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Tela de Apresentação (Fade In / Fade Out - JellyMax)
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "JellyMaxIntro"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local TextLabel = Instance.new("TextLabel")
+TextLabel.Size = UDim2.new(1, 0, 1, 0)
+TextLabel.BackgroundTransparency = 1
+TextLabel.Text = "JellyMax"
+TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextLabel.TextTransparency = 1
+TextLabel.TextScaled = true
+TextLabel.Font = Enum.Font.FredokaOne
+TextLabel.Parent = ScreenGui
+
+-- Configuração do Tween
+local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local fadeIn = TweenService:Create(TextLabel, tweenInfo, {TextTransparency = 0})
+local fadeOut = TweenService:Create(TextLabel, tweenInfo, {TextTransparency = 1})
+
+-- Execução da Animação
+fadeIn:Play()
+fadeIn.Completed:Wait()
+task.wait(1) -- Tempo visível no centro da tela
+fadeOut:Play()
+fadeOut.Completed:Wait()
+
+ScreenGui:Destroy()
+
+-- Interface Principal (Rayfield)
+local Window = Rayfield:CreateWindow({
+   Name = "JellyMax Hub",
+   LoadingTitle = "Carregando JellyMax...",
+   LoadingSubtitle = "por Kevanonimo & Time",
+   ConfigurationSaving = {
+      Enabled = false
+   },
+   KeySystem = false
+})
+
+-- =================================================================
+-- ABA 1: PLAYER
+-- =================================================================
+local TabPlayer = Window:CreateTab("Player", 4483362458)
+
+-- Slider: WalkSpeed
+TabPlayer:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {0, 1000},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Flag = "WS_Slider",
+   Callback = function(Value)
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.WalkSpeed = Value
+      end
+   end,
+})
+
+-- Slider: JumpPower
+TabPlayer:CreateSlider({
+   Name = "JumpPower",
+   Range = {0, 500},
+   Increment = 1,
+   Suffix = " Power",
+   CurrentValue = 50,
+   Flag = "JP_Slider",
+   Callback = function(Value)
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.UseJumpPower = true
+         LocalPlayer.Character.Humanoid.JumpPower = Value
+      end
+   end,
+})
+
+-- Slider: Gravidade
+TabPlayer:CreateSlider({
+   Name = "Gravidade",
+   Range = {0, 2000},
+   Increment = 10,
+   Suffix = " Gravity",
+   CurrentValue = workspace.Gravity,
+   Flag = "Gravity_Slider",
+   Callback = function(Value)
+      workspace.Gravity = Value
+   end,
+})
+
+-- Toggle: ESP de Players
+local ESP_Enabled = false
+local HighlightStorage = {}
+
+local function ApplyESP(player)
+   if player ~= LocalPlayer and player.Character and not HighlightStorage[player] then
+      local highlight = Instance.new("Highlight")
+      highlight.Name = "ESP_JellyMax"
+      highlight.FillColor = Color3.fromRGB(255, 0, 0)
+      highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+      highlight.FillTransparency = 0.5
+      highlight.OutlineTransparency = 0
+      highlight.Adornee = player.Character
+      highlight.Parent = player.Character
+      HighlightStorage[player] = highlight
+   end
+end
+
+local function RemoveESP(player)
+   if HighlightStorage[player] then
+      HighlightStorage[player]:Destroy()
+      HighlightStorage[player] = nil
+   end
+end
+
+TabPlayer:CreateToggle({
+   Name = "ESP de Players",
+   CurrentValue = false,
+   Flag = "ESP_Toggle",
+   Callback = function(Value)
+      ESP_Enabled = Value
+      if ESP_Enabled then
+         for _, player in pairs(Players:GetPlayers()) do
+            ApplyESP(player)
+            player.CharacterAdded:Connect(function()
+               task.wait(0.5)
+               if ESP_Enabled then ApplyESP(player) end
+            end)
+         end
+      else
+         for player, _ in pairs(HighlightStorage) do
+            RemoveESP(player)
+         end
+      end
+   end,
+})
+
+-- Slider: Spin (Girar Ajustável)
+local SpinSpeed = 0
+local SpinConnection = nil
+
+TabPlayer:CreateSlider({
+   Name = "Spin (Girar)",
+   Range = {0, 3000},
+   Increment = 10,
+   Suffix = " Speed",
+   CurrentValue = 0,
+   Flag = "Spin_Slider",
+   Callback = function(Value)
+      SpinSpeed = Value
+      
+      if SpinConnection then 
+         SpinConnection:Disconnect() 
+         SpinConnection = nil
+      end
+
+      if SpinSpeed > 0 then
+         SpinConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+               LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(SpinSpeed / 10), 0)
+            end
+         end)
+      end
+   end,
+})
+
+-- =================================================================
+-- ABA 2: CLIENT / VISUAL
+-- =================================================================
+local TabClient = Window:CreateTab("Client/Visual", 4483362458)
+
+-- Dropdown: Mudar Horário
+TabClient:CreateDropdown({
+   Name = "Mudar Horário (Visual)",
+   Options = {"Dia", "Tarde", "Noite"},
+   CurrentOption = {"Dia"},
+   MultipleOptions = false,
+   Flag = "Lighting_Dropdown",
+   Callback = function(Option)
+      local selected = typeof(Option) == "table" and Option[1] or Option
+      if selected == "Dia" then
+         game:GetService("Lighting").TimeOfDay = "12:00:00"
+      elseif selected == "Tarde" then
+         game:GetService("Lighting").TimeOfDay = "17:30:00"
+      elseif selected == "Noite" then
+         game:GetService("Lighting").TimeOfDay = "00:00:00"
+      end
+   end,
+})
+
+-- Button: F3X (Visual Client Side)
+TabClient:CreateButton({
+   Name = "Obter F3X (Visual)",
+   Callback = function()
+      local f3x = game:GetObjects("rbxassetid://142785488")[1]
+      if f3x then
+         f3x.Parent = LocalPlayer:WaitForChild("Backpack")
+      end
+   end,
+})
+
+-- =================================================================
+-- ABA 3: CREDITS
+-- =================================================================
+local TabCredits = Window:CreateTab("Credits", 4483362458)
+
+TabCredits:CreateParagraph({Title = "Script criado por:", Content = "JellyMax Team"})
+TabCredits:CreateParagraph({Title = "No youtube:", Content = "@kevanonimo\n@thales-k2l\n@mago_plus545"})
