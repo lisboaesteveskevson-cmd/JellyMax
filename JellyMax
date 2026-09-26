@@ -1,11 +1,18 @@
 -- Carregamento da Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Tela de Apresentação (Fade In / Fade Out - JellyMax)
+-- Serviços do Roblox
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 
+-- =================================================================
+-- TELA DE APRESENTAÇÃO (Fade In / Fade Out - JellyMax)
+-- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "JellyMaxIntro"
 ScreenGui.ResetOnSpawn = false
@@ -21,28 +28,26 @@ TextLabel.TextScaled = true
 TextLabel.Font = Enum.Font.FredokaOne
 TextLabel.Parent = ScreenGui
 
--- Configuração do Tween
 local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local fadeIn = TweenService:Create(TextLabel, tweenInfo, {TextTransparency = 0})
 local fadeOut = TweenService:Create(TextLabel, tweenInfo, {TextTransparency = 1})
 
--- Execução da Animação
 fadeIn:Play()
 fadeIn.Completed:Wait()
-task.wait(1) -- Tempo visível no centro da tela
+task.wait(1)
 fadeOut:Play()
 fadeOut.Completed:Wait()
 
 ScreenGui:Destroy()
 
--- Interface Principal (Rayfield)
+-- =================================================================
+-- INTERFACE PRINCIPAL (Rayfield Window)
+-- =================================================================
 local Window = Rayfield:CreateWindow({
    Name = "JellyMax Hub",
    LoadingTitle = "Carregando JellyMax...",
    LoadingSubtitle = "por Kevanonimo & Time",
-   ConfigurationSaving = {
-      Enabled = false
-   },
+   ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
@@ -95,7 +100,7 @@ TabPlayer:CreateSlider({
    end,
 })
 
--- Toggle: ESP de Players
+-- Toggle: ESP de Players (Highlights)
 local ESP_Enabled = false
 local HighlightStorage = {}
 
@@ -121,7 +126,7 @@ local function RemoveESP(player)
 end
 
 TabPlayer:CreateToggle({
-   Name = "ESP de Players",
+   Name = "ESP de Players (Caixa)",
    CurrentValue = false,
    Flag = "ESP_Toggle",
    Callback = function(Value)
@@ -155,18 +160,131 @@ TabPlayer:CreateSlider({
    Flag = "Spin_Slider",
    Callback = function(Value)
       SpinSpeed = Value
-      
       if SpinConnection then 
          SpinConnection:Disconnect() 
          SpinConnection = nil
       end
-
       if SpinSpeed > 0 then
-         SpinConnection = game:GetService("RunService").RenderStepped:Connect(function()
+         SpinConnection = RunService.RenderStepped:Connect(function()
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(SpinSpeed / 10), 0)
             end
          end)
+      end
+   end,
+})
+
+-- Toggle: Fly (Voo)
+local Flying = false
+local FlySpeed = 50
+local FlyBodyVelocity = nil
+local FlyBodyGyro = nil
+
+TabPlayer:CreateToggle({
+   Name = "Fly (Voar)",
+   CurrentValue = false,
+   Flag = "Fly_Toggle",
+   Callback = function(Value)
+      Flying = Value
+      local char = LocalPlayer.Character
+      if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+      local root = char.HumanoidRootPart
+
+      if Flying then
+         FlyBodyVelocity = Instance.new("BodyVelocity")
+         FlyBodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+         FlyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+         FlyBodyVelocity.Parent = root
+
+         FlyBodyGyro = Instance.new("BodyGyro")
+         FlyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+         FlyBodyGyro.CFrame = root.CFrame
+         FlyBodyGyro.Parent = root
+
+         task.spawn(function()
+            while Flying do
+               RunService.RenderStepped:Wait()
+               local cam = workspace.CurrentCamera
+               local moveDir = Vector3.new()
+               if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+               if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+               
+               FlyBodyVelocity.Velocity = moveDir * FlySpeed
+               FlyBodyGyro.CFrame = cam.CFrame
+            end
+         end)
+      else
+         if FlyBodyVelocity then FlyBodyVelocity:Destroy() end
+         if FlyBodyGyro then FlyBodyGyro:Destroy() end
+      end
+   end,
+})
+
+TabPlayer:CreateSlider({
+   Name = "Fly Speed",
+   Range = {10, 300},
+   Increment = 5,
+   Suffix = " Speed",
+   CurrentValue = 50,
+   Flag = "FlySpeed_Slider",
+   Callback = function(Value)
+      FlySpeed = Value
+   end,
+})
+
+-- Toggle: Noclip
+local NoclipEnabled = false
+local NoclipConnection = nil
+
+TabPlayer:CreateToggle({
+   Name = "Noclip (Atravessar Paredes)",
+   CurrentValue = false,
+   Flag = "Noclip_Toggle",
+   Callback = function(Value)
+      NoclipEnabled = Value
+      if NoclipEnabled then
+         NoclipConnection = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+               for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                  if part:IsA("BasePart") then
+                     part.CanCollide = false
+                  end
+               end
+            end
+         end)
+      else
+         if NoclipConnection then NoclipConnection:Disconnect() end
+      end
+   end,
+})
+
+-- Toggle: Infinite Jump
+local InfiniteJumpEnabled = false
+UserInputService.JumpRequest:Connect(function()
+   if InfiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+      LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+   end
+end)
+
+TabPlayer:CreateToggle({
+   Name = "Pulo Infinito",
+   CurrentValue = false,
+   Flag = "InfJump_Toggle",
+   Callback = function(Value)
+      InfiniteJumpEnabled = Value
+   end,
+})
+
+-- Button: Reset Character
+TabPlayer:CreateButton({
+   Name = "Redefinir Personagem (Reset)",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.Health = 0
       end
    end,
 })
@@ -186,16 +304,16 @@ TabClient:CreateDropdown({
    Callback = function(Option)
       local selected = typeof(Option) == "table" and Option[1] or Option
       if selected == "Dia" then
-         game:GetService("Lighting").TimeOfDay = "12:00:00"
+         Lighting.TimeOfDay = "12:00:00"
       elseif selected == "Tarde" then
-         game:GetService("Lighting").TimeOfDay = "17:30:00"
+         Lighting.TimeOfDay = "17:30:00"
       elseif selected == "Noite" then
-         game:GetService("Lighting").TimeOfDay = "00:00:00"
+         Lighting.TimeOfDay = "00:00:00"
       end
    end,
 })
 
--- Button: F3X (Visual Client Side)
+-- Button: F3X
 TabClient:CreateButton({
    Name = "Obter F3X (Visual)",
    Callback = function()
@@ -206,8 +324,142 @@ TabClient:CreateButton({
    end,
 })
 
+-- Slider: FOV Changer
+TabClient:CreateSlider({
+   Name = "Campo de Visão (FOV)",
+   Range = {70, 120},
+   Increment = 1,
+   Suffix = " FOV",
+   CurrentValue = 70,
+   Flag = "FOV_Slider",
+   Callback = function(Value)
+      workspace.CurrentCamera.FieldOfView = Value
+   end,
+})
+
+-- Toggle: Fullbright
+local FullbrightEnabled = false
+local OldAmbient = Lighting.Ambient
+local OldOutdoorAmbient = Lighting.OutdoorAmbient
+
+TabClient:CreateToggle({
+   Name = "Fullbright (Tirar Sombras/Escuro)",
+   CurrentValue = false,
+   Flag = "Fullbright_Toggle",
+   Callback = function(Value)
+      FullbrightEnabled = Value
+      if FullbrightEnabled then
+         OldAmbient = Lighting.Ambient
+         OldOutdoorAmbient = Lighting.OutdoorAmbient
+         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+         Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+      else
+         Lighting.Ambient = OldAmbient
+         Lighting.OutdoorAmbient = OldOutdoorAmbient
+      end
+   end,
+})
+
+-- Button: FPS Booster
+TabClient:CreateButton({
+   Name = "Otimizar FPS (FPS Booster)",
+   Callback = function()
+      for _, v in pairs(workspace:GetDescendants()) do
+         if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("Decal") or v:IsA("Texture") then
+            v:Destroy()
+         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Enabled = false
+         end
+      end
+      Lighting.GlobalShadows = false
+      Lighting.FogEnd = 9e9
+      Rayfield:Notify({Title = "FPS Booster", Content = "Texturas e efeitos otimizados com sucesso!", Duration = 3})
+   end,
+})
+
 -- =================================================================
--- ABA 3: CREDITS
+-- ABA 3: UTILITÁRIOS / FERRAMENTAS
+-- =================================================================
+local TabUtils = Window:CreateTab("Utilitários", 4483362458)
+
+-- Button: Dark Dex
+TabUtils:CreateButton({
+   Name = "Carregar Dark Dex (Explorer)",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+   end,
+})
+
+-- Button: Remote Spy
+TabUtils:CreateButton({
+   Name = "Carregar SimpleSpy (Remote Spy)",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/exunys/SimpleSpy-V3/main/src/source.lua"))()
+   end,
+})
+
+-- Button: Rejoin
+TabUtils:CreateButton({
+   Name = "Reentrar no Servidor (Rejoin)",
+   Callback = function()
+      TeleportService:Teleport(game.PlaceId, LocalPlayer)
+   end,
+})
+
+-- Button: Server Hop
+TabUtils:CreateButton({
+   Name = "Trocar de Servidor (Server Hop)",
+   Callback = function()
+      local HttpService = game:GetService("HttpService")
+      local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+      for _, server in pairs(servers) do
+         if server.playing < server.maxPlayers and server.id ~= game.JobId then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+            break
+         end
+      end
+   end,
+})
+
+-- Toggle: Force Shift Lock
+TabUtils:CreateToggle({
+   Name = "Forçar Shift Lock",
+   CurrentValue = false,
+   Flag = "ShiftLock_Toggle",
+   Callback = function(Value)
+      LocalPlayer.DevEnableMouseLock = Value
+   end,
+})
+
+-- =================================================================
+-- ABA 4: CONFIGURAÇÕES DO HUB
+-- =================================================================
+local TabSettings = Window:CreateTab("Configurações", 4483362458)
+
+-- Keybind para Abrir/Fechar Menu
+TabSettings:CreateKeybind({
+   Name = "Atalho para Minimizar/Abrir Menu",
+   CurrentKeybind = "RightControl",
+   HoldToInteract = false,
+   Flag = "ToggleKeybind",
+   Callback = function(Keybind)
+      -- O próprio Rayfield lida com a visibilidade ao pressionar a tecla
+   end,
+})
+
+-- Button: Destruir Interface
+TabSettings:CreateButton({
+   Name = "Destruir Hub (Segurança)",
+   Callback = function()
+      Rayfield:Destroy()
+   end,
+})
+
+-- =================================================================
+-- ABA 5: CREDITS
 -- =================================================================
 local TabCredits = Window:CreateTab("Credits", 4483362458)
 
